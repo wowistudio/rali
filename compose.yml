@@ -1,0 +1,44 @@
+services:
+    redis:
+        image: redis:7-alpine
+        container_name: rali-redis
+        ports:
+            - "6379:6379"
+        healthcheck:
+            test: [ "CMD", "redis-cli", "ping" ]
+            interval: 5s
+            timeout: 5s
+            retries: 5
+
+    redis-insight:
+        image: redis/redisinsight:latest
+        container_name: rali-redis-insight
+        restart: always
+        ports:
+            - "5540:5540"
+        volumes:
+            - redis-insight:/data
+            # db:
+            #     image: postgres:17.6-alpine
+            #     container_name: rali-db
+            #     environment:
+            #         POSTGRES_USER: repo
+            #         POSTGRES_PASSWORD: repo
+            #         POSTGRES_DB: repo_${NODE_ENV-development}
+            #     ports:
+            #         - "5434:5432"
+            #     volumes:
+            #         - rali_pgdata:/var/lib/postgresql/data
+            #     healthcheck:
+            #         test: [ "CMD-SHELL", "pg_isready -U repo -d repo_${NODE_ENV-development}" ]
+            #         interval: 5s
+            #         timeout: 5s
+            #         retries: 5
+
+            # volumes:
+            #     rali_pgdata:
+            #         driver: local
+
+volumes:
+    redis-insight:
+        driver: local
