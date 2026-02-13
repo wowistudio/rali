@@ -1,15 +1,17 @@
 # Rali - Rate Limiter
 
+> Disclaimer: this is a learning project for me. Diving in the world of rate limiters. I'm not an expert whatsoever. Every decision & claim in this project can and should be questioned :).
+
 Our aim for this project is to design & implement a distributed rate limiter. Before diving in to the code, we will cover the need for a rate limiter, communication strategies in a distributed limiter architecture and discuss several rate limiting algorithms
 
-## Why do we need rate limiting?
+## 1. Why do we need rate limiting?
 
 Rate limiting is used to prevent excessive use of api resources by clients. This behavior can be intentional (planned attacks like brute force, ddos) or unintentional (misconfigured clients, testing, spike in users request the same resource). It helps even distribution among users.
 
 It can also serve other goals, like ensuring up-time for business critical processes, keeping control over CPU-intensive endpoints, and shedding load in case of overload ([Stripe](https://stripe.com/blog/rate-limiters)).
 
 
-## Communication algorithms
+## 2. Communication algorithms
 
 1. **Broadcasting (all to all)** - 
 Each limiter updates all other limiters. Does not scale well as number of limiters grow.
@@ -19,7 +21,7 @@ Each limiter updates a (random) fixed number of limiters. The idea is that updat
 Each limiter keeps local state and updates to a central cache periodically (Redis, Memcached). It reduces overhead, but creates a single point of failure (in terms of load and correctness)
 
 
-## Rate limiting algorithms
+## 3. Rate limiting algorithms
 
 Numerous algorithms exist, each with their own pros and cons when it comes to latency and complexity. This section describes each algorithm in detail; the table below summarizes them.
 
@@ -86,7 +88,7 @@ In practice, for small-scale apps it’s almost indistinguishable, but in high-t
 | Token bucket (leaky bucket) | Tokens added at constant rate; each request consumes a token | Current token count & last refill timestamp | Flexible bursts; extra state, tuning |
 | Generic Cell Rate Algorithm (GCRA) | TAT-based: allow if gap between now and TAT ≤ L | Last theoretical arrival time (TAT) | Precise timing, minimal state; hard to explain |
 
-## What we will build
+## 4. What we will build
 
 ### Functional Requirements
 - Is request rate limited or not
@@ -152,8 +154,29 @@ sequenceDiagram
     end 
 ```
 
+### Redis Lua Script `windowIncrement`
 
-## Resources 
+> `./apps/api/src/redis/index.ts:10`
+
+
+- **call behavior** - The lua script looks like a lot of code, but is not send to Redis on each call. Instead `ioredis` sends the Lua script to Redis using `SCRIPT LOAD`. On the first call the script is send to Redis, Redis compiles the script and returns SHA1 hash. Every next call uses `EVALSHA <sha1> ...`
+- **redis commands** - On each call, the script uses `MGET` to get current count, previous count & start window timestamp. On the end of each call (if not passed limit), the script uses `SET` thrice to update the counts & timestamp. If passed limit, it uses `SET` once to set the limited until.
+- **calculation of limitedUntil** - When we estimate that the curr count will go over the limit, we want to calculate until when the user is blocked in the current window. We do this by assuming there must exist ratio R for which the estimation does not exceed the limit (see below). This ratio then translate to a time in the future where the next request is allowed. In absence of previous count we set ratio to 1, which result in a future time equal to the end of the current window.
+```
+ratio R, previousCount P, currentCount C, limit L
+
+=> P(1 - R) + C = L
+=> ...
+=> R = 1 - ((L - C) / P)
+=> R = min(1, R)
+```
+
+## 5. Thoughts
+
+- The lua script is heave on GET & SET, also feels like a lot is calculated. Not sure what the impact is of this on latency (I dont consider optimizing Redis in this project). I feel like we can move calculations to the servers, but doesn't that lead to race conditions? For example, when the server asks Redis for current values, determines if should be rate limited, and then returns the answer to Redis.
+
+
+## 6. Resources 
 
 - https://www.youtube.com/watch?v=8QyygfIloMc
 - https://smudge.ai/blog/ratelimit-algorithms
