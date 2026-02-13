@@ -3,6 +3,7 @@ import { z } from "zod";
 
 const output = z.object({
   allowed: z.boolean(),
+  retryAfterMs: z.number().optional(),
 })
 
 const call = oc
