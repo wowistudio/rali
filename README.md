@@ -1,6 +1,6 @@
 # Rali - Rate Limiter
 
-> Disclaimer: this is a learning project for me. Diving in the world of rate limiters. I'm not an expert whatsoever. Every decision & claim in this project can and should be questioned :).
+> 🧠 Disclaimer: this is a learning project for me. Diving in the world of rate limiters. I'm not an expert whatsoever. Every decision & claim in this project can and should be questioned :). Also, the code might not be the most robust & fault-tolerant ever. Working on it..
 
 Our aim for this project is to design & implement a distributed rate limiter. Before diving in to the code, we will cover the need for a rate limiter, communication strategies in a distributed limiter architecture and discuss several rate limiting algorithms
 
@@ -174,6 +174,7 @@ ratio R, previousCount P, currentCount C, limit L
 ## 5. Thoughts
 
 - The lua script is heave on GET & SET, also feels like a lot is calculated. Not sure what the impact is of this on latency (I dont consider optimizing Redis in this project). I feel like we can move calculations to the servers, but doesn't that lead to race conditions? For example, when the server asks Redis for current values, determines if should be rate limited, and then returns the answer to Redis.
+- Maybe try to add another endpoint that uses a different rate limiting algorithm, and compare performance. 
 
 
 ## 6. Resources 

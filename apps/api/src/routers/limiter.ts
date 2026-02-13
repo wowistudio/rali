@@ -7,6 +7,7 @@ const call = os.contract.limiter.call.handler(async ({ input: { key, maxRequests
   // 1 - check local cache
   const cachedLimitedUntil = await localCache.getLimited(key);
   if (cachedLimitedUntil) {
+    console.debug('limitation found locally:', key, cachedLimitedUntil);
     return {
       allowed: false,
       retryAfterMs: retryAfter(cachedLimitedUntil)
@@ -18,6 +19,7 @@ const call = os.contract.limiter.call.handler(async ({ input: { key, maxRequests
   if (limitedUntil) {
     const limitedUntilDate = new Date(Number(limitedUntil));
     localCache.setLimited(key, limitedUntilDate);
+    console.debug('limitation found inredis:', key, limitedUntilDate);
     return {
       allowed: false,
       retryAfterMs: retryAfter(limitedUntilDate)

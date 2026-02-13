@@ -8,7 +8,7 @@ const redisClient: OurRedis = new RedisInterface({
 });
 
 const windowIncrement = `
-    redis.log(redis.LOG_NOTICE, "=============================================")
+    redis.log(redis.LOG_DEBUG, "=============================================")
     -- KEYS[1] = rate limit key
     -- ARGV[1] = current timestamp in milliseconds (in same units as window size)
     -- ARGV[2] = window size
@@ -34,13 +34,13 @@ const windowIncrement = `
     
     -- check if window rolled over
     if now >= start + window then
-        redis.log(redis.LOG_NOTICE, "window rolled over")
+        redis.log(redis.LOG_DEBUG, "window rolled over")
         previous = current
         current = 0
         start = now - (now % window)
     end
 
-    redis.log(redis.LOG_NOTICE, "curr:", current, "prev:", previous)
+    redis.log(redis.LOG_DEBUG, "curr:", current, "prev:", previous)
     
     -- compute sliding estimate
     local elapsed = now - start
@@ -51,7 +51,7 @@ const windowIncrement = `
         return math.floor(n * 100 + 0.5) / 100
     end
 
-    redis.log(redis.LOG_NOTICE, "estimated:", round2(estimated), "elapsed:", round2(elapsed))
+    redis.log(redis.LOG_DEBUG, "estimated:", round2(estimated), "elapsed:", round2(elapsed))
 
     -- reject if over limit
     if estimated >= limit then
@@ -65,12 +65,12 @@ const windowIncrement = `
             ratio = math.min(1, ratio)
         end
         
-        redis.log(redis.LOG_NOTICE, "ratio:", round2(ratio))
+        redis.log(redis.LOG_DEBUG, "ratio:", round2(ratio))
 
         local ratioUntil = ratio * window  
         local limitedUntil = start + ratioUntil
         local ttl = math.ceil(limitedUntil - now)
-        redis.log(redis.LOG_NOTICE, "'" .. key .. "' will be limited until", limitedUntil, "for", ttl, "seconds")
+        redis.log(redis.LOG_DEBUG, "'" .. key .. "' will be limited until", limitedUntil, "for", ttl, "seconds")
 
         -- set the limitedUntil timestamp in milliseconds with TTL
         limitedUntil = limitedUntil * 1000

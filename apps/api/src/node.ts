@@ -4,6 +4,8 @@ import { CORSPlugin } from '@orpc/server/plugins';
 import { createServer } from 'node:http';
 import { appRouter } from "./routers/index.ts";
 
+const PORT = process.env.PORT ? parseInt(process.env.PORT) : 4000;
+
 const handler = new OpenAPIHandler(appRouter, {
     plugins: [new CORSPlugin()],
     interceptors: [
@@ -24,8 +26,4 @@ const server = createServer(async (req, res) => {
     }
 })
 
-server.listen(
-    4000,
-    '127.0.0.1',
-    () => console.log('Listening on 127.0.0.1:4000')
-)
+server.listen(PORT, '127.0.0.1', () => console.log(`Listening on 127.0.0.1:${PORT}`))

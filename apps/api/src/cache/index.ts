@@ -11,6 +11,10 @@ class LocalCache {
 
     async setLimited(key: string, until: Date) {
         const ttlMs = until.getTime() - Date.now();
+        if (ttlMs <= 0) {
+            console.log('ttl is less than 0, not setting', key, ttlMs);
+            return;
+        }
         console.log('setting limited until', key, ttlMs);
         await this.cache.set<number>(key, until.getTime(), ttlMs);
     }

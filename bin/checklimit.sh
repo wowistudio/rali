@@ -5,8 +5,11 @@ set -e
 key=$1
 maxRequests=$2
 windowSeconds=$3
+port=${4:-4000}
 
-curl --location 'http://localhost:4000/limiter/call' \
+url="http://localhost:${port}/limiter/call"
+echo $url
+curl --location "${url}" \
 --header 'Content-Type: application/json' \
 --data '{
     "key": "'${key}'",
