@@ -1,19 +1,22 @@
 import { oc } from "@orpc/contract";
 import { z } from "zod";
 
-const output = z.object({
+export const limiterResponse = z.object({
   allowed: z.boolean(),
-  retryAfterMs: z.number().optional(),
+  retryAfter: z.number().optional(),
+})
+
+export const limiterInput = z.object({
+  key: z.string(),
+  limit: z.number(),
+  window: z.number(),
+  strategy: z.enum(['sliding', 'fixed'])
 })
 
 const call = oc
-  .input(z.object({
-    key: z.string(),
-    maxRequests: z.number(),
-    windowSeconds: z.number(),
-  }))
-  .output(output)
+  .input(limiterInput)
+  .output(limiterResponse)
 
 export default {
-  call
+  call,
 }
