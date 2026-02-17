@@ -8,7 +8,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 RESULTS_CSV="${SCRIPT_DIR}/results/benchmarks.csv"
 
 if [[ ! -f "$RESULTS_CSV" ]]; then
-    echo "No results found. Run ./run-all.sh first."
+    echo "No results found. Run ./run-one.sh <label> first."
     exit 1
 fi
 

@@ -16,23 +16,36 @@ abstract class LimiterHandler {
         this.redis = redis;
     }
 
+    localCacheKey(key: string) {
+        return `${key}:retry_after`;
+    }
+
     getRetryAfterSeconds = (until: Date | number): number => {
         if (until instanceof Date)
             return until.getTime() - Date.now();
         return (until) - Date.now();
     }
 
-    setLocalRetryAfter(key: string, value: TCacheVal, retryAfter: number) {
-        this.#cache.set(key, value, new Date(retryAfter * 1000).getTime());
+    setLocalRetryAfter(key: string, value: TCacheVal) {
+        this.#cache.set(this.localCacheKey(key), value);
     }
 
-    getLocalRetryAfter(prefix: string) {
-        return this.#cache.get<TCacheVal>(`${prefix}:retry_after`);
+    async getLocalRetryAfter(prefix: string) {
+        const value = await this.#cache.get<TCacheVal>(this.localCacheKey(prefix));
+        if (!value) return null;
+        if (value < Date.now()) {
+            console.log('local cache expired for ', prefix);
+            await this.#cache.delete(this.localCacheKey(prefix));
+            return null;
+        }
+        return value;
     }
 
     async getRemoteRetryAfter(prefix: string) {
         const value = await this.redis.get(`${prefix}:retry_after`);
         if (!value) return null;
+        if (Number(value) < Date.now())
+            return null;
         return Number(value);
     }
 
@@ -52,7 +65,7 @@ abstract class LimiterHandler {
 
         const remoteValue = await this.getRemoteRetryAfter(key);
         if (remoteValue) {
-            this.setLocalRetryAfter(key, remoteValue, window);
+            this.setLocalRetryAfter(key, remoteValue);
             console.debug('(redis) retry after found for ', key);
             return {
                 allowed: false,

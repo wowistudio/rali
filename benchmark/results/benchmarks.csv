@@ -1,0 +1,4 @@
+timestamp,label,total_requests,requests_per_second,total_bytes,errors,duration
+2026-02-17T14:23:54.583Z,slidingWindow,56580,5144.19,13296300,0,11.01
+2026-02-17T14:24:50.094Z,fixedWindow,57516,5229.64,13516260,0,11.01
+2026-02-17T14:26:23.162Z,noIdReplacement,175321,15938.91,44513323,0,11.01

@@ -8,7 +8,7 @@ const redisClient: OurRedis = new RedisInterface({
 });
 
 const fixedWindowIncrement = `
-    redis.log(2, "=============================================")
+    redis.log(redis.LOG_DEBUG, "=============================================")
     -- KEYS[1] = rate limit key
     -- ARGV[1] = current timestamp in seconds (in same units as window size)
     -- ARGV[2] = window size
@@ -23,17 +23,31 @@ const fixedWindowIncrement = `
     local key = KEYS[1]
     local countKey = key .. ":count"
     local windowKey = key .. ":window_end"
+    local retryAfterKey = key .. ":retry_after"
     
-    local windowEnd = now + window
     local count = redis.call("INCR", countKey)
+
     if count == 1 then
+        local windowEnd = now + window
         redis.call("SET", windowKey, windowEnd, "EX", window)
         redis.call("EXPIRE", countKey, window)
+    elseif count == limit then
+        -- get window end from redis
+        local windowEnd = redis.call("GET", windowKey)
+        if not windowEnd then
+            return {0}
+        end
+        windowEnd = tonumber(windowEnd)
+        local retryAfter = windowEnd
+        local ttl = math.ceil(retryAfter - now)
+        redis.log(redis.LOG_DEBUG, "limit reached, will be limited for", ttl, "seconds")
+        redis.call("SET", retryAfterKey, retryAfter * 1000, "EX", ttl)
+        return {0, retryAfter}
     end
     return {count}
 `
 const windowIncrement = `
-    redis.log(2, "=============================================")
+    redis.log(redis.LOG_DEBUG, "=============================================")
     -- KEYS[1] = rate limit key
     -- ARGV[1] = current timestamp in seconds (in same units as window size)
     -- ARGV[2] = window size
@@ -48,7 +62,7 @@ const windowIncrement = `
     local ccountKey = key .. ":ccount"
     local pcountKey = key .. ":pcount"
     local wstartKey = key .. ":wstart"
-    local luntilKey = key .. ":retry_after"
+    local rafterKey = key .. ":retry_after"
     
     -- read stored values from separate keys in single call
     local values = redis.call("MGET", ccountKey, pcountKey, wstartKey)
@@ -58,7 +72,7 @@ const windowIncrement = `
     
     -- check if window rolled over
     if now >= start + window then
-        redis.log(2, "window rolled over")
+        redis.log(redis.LOG_DEBUG, "window rolled over")
         previous = current
         current = 0
         start = now - (now % window)
@@ -67,7 +81,7 @@ const windowIncrement = `
     -- increment current counter
     current = current + 1
 
-    redis.log(2, "curr:", current, "prev:", previous)
+    redis.log(redis.LOG_DEBUG, "curr:", current, "prev:", previous)
     
     -- compute sliding estimate
     local elapsed = now - start
@@ -78,7 +92,7 @@ const windowIncrement = `
         return math.floor(n * 100 + 0.5) / 100
     end
 
-    redis.log(2, "estimated:", round2(estimated), "elapsed:", round2(elapsed), "capacity:", limit - estimated)
+    redis.log(redis.LOG_DEBUG, "estimated:", round2(estimated), "elapsed:", round2(elapsed), "capacity:", limit - estimated)
 
     -- reject if over limit
     if estimated >= limit then
@@ -92,18 +106,18 @@ const windowIncrement = `
             ratio = math.min(1, ratio)
         end
         
-        redis.log(2, "ratio:", round2(ratio))
+        redis.log(redis.LOG_DEBUG, "ratio:", round2(ratio))
 
         local ratioUntil = ratio * window  
-        local limitedUntil = start + ratioUntil
-        local ttl = math.ceil(limitedUntil - now)
-        redis.log(2, "'" .. key .. "' will be limited until", limitedUntil, "for", ttl, "seconds")
+        local retryAfter = start + ratioUntil
+        local ttl = math.ceil(retryAfter - now)
+        redis.log(redis.LOG_DEBUG, "'" .. key .. "' will be limited until", retryAfter, "for", ttl, "seconds")
 
-        -- set the limitedUntil timestamp in seconds with TTL
-        limitedUntil = limitedUntil * 1000
-        redis.call("SET", luntilKey, limitedUntil, "EX", ttl)
+        -- set the retryAfter timestamp in seconds with TTL
+        retryAfter = retryAfter * 1000
+        redis.call("SET", rafterKey, retryAfter, "EX", ttl)
 
-        return {0, limitedUntil}
+        return {0, retryAfter}
     end
     
     -- store back to Redis as separate keys with TTL in single operation
@@ -126,7 +140,7 @@ redisClient.defineCommand("fixedWindowIncrement", {
 });
 
 export interface OurRedis extends RedisInterface {
-    windowIncrement(key: string, now: number, window: number, limit: number): Promise<[number, number | null]>; // Returns [limited (0/1), limitedUntil (timestamp in seconds)]
+    windowIncrement(key: string, now: number, window: number, limit: number): Promise<[number, number | null]>; // Returns [limited (0/1), retryAfter (timestamp in seconds)]
     fixedWindowIncrement(key: string, now: number, window: number, limit: number): Promise<number>;
 }
 
